@@ -48,6 +48,27 @@ public class Sandbox implements AutoCloseable {
     // -------------------------------------------------------------------------
     private final String           sandboxId;
     private final String           sandboxDomain;
+
+    /**
+     * Template identifier from the create/connect response; may be a server-returned alias.
+     * Immutable local snapshot, null if omitted or null in the response. Reading it makes no request.
+     */
+    private final String templateId;
+
+    /**
+     * Client identifier from the create/connect response. This field is deprecated in the upstream
+     * E2B protocol and may be absent. Immutable local snapshot, null if omitted or null;
+     * reading it makes no request.
+     */
+    private final String clientId;
+
+    /**
+     * Service-reported envd version from the create/connect response, preserved without normalization.
+     * This is not a measurement of the running binary. Immutable local snapshot, null if omitted
+     * or null in the response; reading it makes no request.
+     */
+    private final String envdVersion;
+
     private final ConnectionConfig connectionConfig;
     private final E2bApiClient     apiClient;
 
@@ -81,6 +102,9 @@ public class Sandbox implements AutoCloseable {
                     String accessToken, String trafficAccessToken,
                     String requestId, Map<String, String> headers) {
         this.sandboxId          = info.getSandboxId();
+        this.templateId         = info.getTemplateId();
+        this.clientId           = info.getClientId();
+        this.envdVersion        = info.getEnvdVersion();
         // The create/connect responses carry `domain` only when the gateway overrides it
         // (it is nullable/omitempty); otherwise fall back to the configured E2B_DOMAIN,
         // matching the Python SDK (`sandbox_domain or connection_config.domain`).
@@ -108,6 +132,8 @@ public class Sandbox implements AutoCloseable {
 
     /**
      * Create a new sandbox from a template and return it.
+     * The returned instance retains templateId, clientId and envdVersion from this response;
+     * their getters do not issue additional requests.
      *
      * @param template Template ID or name (e.g. "base", "python")
      * @param config   Connection configuration
@@ -154,6 +180,8 @@ public class Sandbox implements AutoCloseable {
 
     /**
      * Connect to a sandbox, optionally setting a new timeout while resuming.
+     * The returned instance captures its own templateId, clientId and envdVersion snapshot
+     * from the connect response without changing previously created instances.
      *
      * @param sandboxId       Sandbox ID
      * @param config          Connection configuration
@@ -250,6 +278,7 @@ public class Sandbox implements AutoCloseable {
 
     /**
      * Get the latest info for this sandbox.
+     * Issues a new request; does not update this instance's create/connect response snapshot.
      *
      * @return sandbox details plus {@code requestId} from response headers
      */
@@ -578,6 +607,7 @@ public class Sandbox implements AutoCloseable {
         info.setSandboxId(response.getSandboxId());
         info.setSandboxDomain(response.getSandboxDomain());
         info.setTemplateId(response.getTemplateId());
+        info.setClientId(response.getClientId());
         info.setEnvdAccessToken(response.getEnvdAccessToken());
         info.setTrafficAccessToken(response.getTrafficAccessToken());
         info.setEnvdVersion(response.getEnvdVersion());
