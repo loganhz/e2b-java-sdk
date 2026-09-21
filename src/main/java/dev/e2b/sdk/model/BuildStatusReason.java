@@ -6,21 +6,16 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * Reason for the current template build status, typically populated when a build fails.
+ */
 @Data
 @NoArgsConstructor
-public class TemplateBuildInfo {
-    @JsonProperty("templateID")
-    private String templateId;
+public class BuildStatusReason {
+    private String message;
 
-    @JsonProperty("buildID")
-    private String buildId;
-
-    private TemplateBuildStatus status;
-
-    private List<String> logs;
+    private String step;
 
     @JsonProperty("logEntries")
     private List<BuildLogEntry> logEntries;
-
-    private BuildStatusReason reason;
 }

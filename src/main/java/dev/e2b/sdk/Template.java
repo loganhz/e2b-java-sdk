@@ -230,7 +230,13 @@ public final class Template {
                 return get(created.getTemplateId(), config).getTemplate();
             }
             if (status.getStatus() == TemplateBuildStatus.ERROR) {
-                throw new TemplateException("Template build failed for " + alias);
+                BuildStatusReason reason = status.getReason();
+                String serverMessage = reason == null ? null : reason.getMessage();
+                String message = "Template build failed for " + alias;
+                if (serverMessage != null && !serverMessage.trim().isEmpty()) {
+                    message = message + ": " + serverMessage;
+                }
+                throw new TemplateException(message);
             }
             sleepQuietly(1500);
         }

@@ -1,12 +1,14 @@
 package dev.e2b.sdk;
 
 import dev.e2b.sdk.client.ConnectionConfig;
+import dev.e2b.sdk.exception.TemplateException;
 import dev.e2b.sdk.model.*;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.*;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
@@ -104,6 +106,62 @@ class TemplateTest {
     }
 
     @Test
+    void getBuildStatus_returnsStructuredReason() {
+        server.enqueue(new MockResponse()
+                .setBody("{\"templateID\":\"tpl-1\",\"buildID\":\"b-1\",\"status\":\"error\","
+                        + "\"logs\":[],\"logEntries\":[],\"reason\":{"
+                        + "\"message\":\"image pull denied\",\"step\":\"image_pull\",\"logEntries\":[{"
+                        + "\"timestamp\":\"2026-09-18T01:02:03Z\",\"message\":\"manifest unknown\","
+                        + "\"level\":\"error\",\"step\":\"image_pull\"}]}}")
+                .setHeader("Content-Type", "application/json")
+                .setHeader("X-Request-ID", "req-build-status-1"));
+
+        GetTemplateBuildStatusOutput output = Template.getBuildStatus("tpl-1", "b-1", config);
+        TemplateBuildInfo buildInfo = output.getBuildInfo();
+
+        assertEquals(TemplateBuildStatus.ERROR, buildInfo.getStatus());
+        assertEquals("image pull denied", buildInfo.getReason().getMessage());
+        assertEquals("image_pull", buildInfo.getReason().getStep());
+        assertEquals(1, buildInfo.getReason().getLogEntries().size());
+        BuildLogEntry reasonLog = buildInfo.getReason().getLogEntries().get(0);
+        assertEquals(Instant.parse("2026-09-18T01:02:03Z"), reasonLog.getTimestamp());
+        assertEquals("manifest unknown", reasonLog.getMessage());
+        assertEquals("error", reasonLog.getLevel());
+        assertEquals("image_pull", reasonLog.getStep());
+        assertEquals("req-build-status-1", output.getRequestId());
+        assertEquals("req-build-status-1", output.getHeaders().get("X-Request-ID"));
+    }
+
+    @Test
+    void buildFromImage_usesReasonMessage() {
+        assertBuildFailure(
+                "{\"message\":\"image pull denied\"}",
+                "Template build failed for my-template: image pull denied");
+    }
+
+    @Test
+    void buildFromImage_preservesReasonMessageWhitespace() {
+        assertBuildFailure(
+                "{\"message\":\"  image pull denied  \"}",
+                "Template build failed for my-template:   image pull denied  ");
+    }
+
+    @Test
+    void buildFromImage_fallsBackWhenReasonIsMissing() {
+        assertBuildFailure(null, "Template build failed for my-template");
+    }
+
+    @Test
+    void buildFromImage_fallsBackWhenReasonMessageIsMissing() {
+        assertBuildFailure("{}", "Template build failed for my-template");
+    }
+
+    @Test
+    void buildFromImage_fallsBackWhenReasonMessageIsBlank() {
+        assertBuildFailure("{\"message\":\"   \"}", "Template build failed for my-template");
+    }
+
+    @Test
     void updateAndDelete() {
         server.enqueue(new MockResponse()
                 .setBody("{\"names\":[\"base\"]}")
@@ -113,5 +171,26 @@ class TemplateTest {
         TemplateUpdateResponse updated = Template.setPublic("tpl-1", true, config).getResponse();
         assertEquals(Collections.singletonList("base"), updated.getNames());
         assertTrue(Template.delete("tpl-1", config).isDeleted());
+    }
+
+    private void assertBuildFailure(String reasonJson, String expectedMessage) {
+        server.enqueue(new MockResponse()
+                .setResponseCode(202)
+                .setBody("{\"templateID\":\"tpl-new\",\"buildID\":\"b-new\"}")
+                .setHeader("Content-Type", "application/json"));
+        server.enqueue(new MockResponse().setResponseCode(202));
+
+        String reason = reasonJson == null ? "" : ",\"reason\":" + reasonJson;
+        server.enqueue(new MockResponse()
+                .setBody("{\"templateID\":\"tpl-new\",\"buildID\":\"b-new\",\"status\":\"error\","
+                        + "\"logs\":[],\"logEntries\":[]" + reason + "}")
+                .setHeader("Content-Type", "application/json"));
+
+        TemplateException error = assertThrows(
+                TemplateException.class,
+                () -> Template.buildFromImage("my-template", "python:3.11", config, 5));
+
+        assertEquals(expectedMessage, error.getMessage());
+        assertEquals(3, server.getRequestCount(), "build failure must stop after the first status response");
     }
 }
