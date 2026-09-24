@@ -21,11 +21,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Env var wire behavior:
+ * Env var wire behavior must match sandbox-gateway:
  * <ul>
  *   <li>JSON field name {@code envVars} (not {@code envs} / {@code environmentVariables})</li>
- *   <li>Normalize the new template build env vars.</li>
- *   <li>Preserve existing sandbox create env vars exactly as supplied.</li>
+ *   <li>trim keys/values; drop empty keys (gateway {@code e2bTrimEnvVars})</li>
+ *   <li>omit empty maps from JSON ({@code omitempty})</li>
  * </ul>
  */
 class EnvVarsWireTest {
@@ -97,7 +97,7 @@ class EnvVarsWireTest {
     }
 
     @Test
-    void newSandbox_preservesExistingEnvVarsWireValues() throws Exception {
+    void newSandbox_serializesEnvVarsAndOmitsEmpty() throws Exception {
         Map<String, String> env = new HashMap<String, String>();
         env.put(" USER_ENV ", " override ");
 
@@ -106,13 +106,13 @@ class EnvVarsWireTest {
                 .envVars(env)
                 .build());
         assertTrue(json.contains("\"envVars\""), json);
-        assertTrue(json.contains("\" USER_ENV \":\" override \""), json);
+        assertTrue(json.contains("\"USER_ENV\":\"override\""), json);
 
         String emptyJson = mapper.writeValueAsString(NewSandbox.builder()
                 .templateName("base")
                 .envVars(Collections.<String, String>emptyMap())
                 .build());
-        assertTrue(emptyJson.contains("\"envVars\":{}"), emptyJson);
+        assertFalse(emptyJson.contains("envVars"), emptyJson);
     }
 
     @Test
@@ -137,7 +137,7 @@ class EnvVarsWireTest {
     }
 
     @Test
-    void sandboxCreate_postsOriginalEnvVars() throws Exception {
+    void sandboxCreate_postsNormalizedEnvVars() throws Exception {
         server.enqueue(new MockResponse()
                 .setBody("{\"sandboxID\":\"sbx-1\",\"templateID\":\"base\",\"clientID\":\"c-1\","
                         + "\"envdVersion\":\"0.1.0\",\"envdAccessToken\":\"tok\"}")
@@ -150,7 +150,7 @@ class EnvVarsWireTest {
         RecordedRequest req = server.takeRequest();
         assertEquals("/sandboxes", req.getPath());
         String body = req.getBody().readUtf8();
-        assertTrue(body.contains("\"envVars\":{\" SHARED \":\" from-sandbox \"}"), body);
+        assertTrue(body.contains("\"envVars\":{\"SHARED\":\"from-sandbox\"}"), body);
         assertTrue(body.contains("\"templateName\":\"base\"") || body.contains("\"templateID\":\"base\""), body);
     }
 }
