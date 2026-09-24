@@ -110,11 +110,25 @@ Sandbox.kill(sandboxId, config);
 Sandbox.pause(sandboxId, config);
 ```
 
-### Create/connect response fields
+### Create/connect response fields (since 3.0.4)
 
-The returned sandbox exposes `getTemplateId()`, `getClientId()`, and `getEnvdVersion()`
-from the create or connect response without an additional request. Missing fields return `null`;
-`getInfo()` fetches fresh information without changing these response snapshots.
+Starting with 3.0.4, read the following fields directly from the returned sandbox without
+an additional `getInfo()` request:
+
+```java
+Sandbox sandbox = Sandbox.create("code-interpreter-v1", config);
+String templateId = sandbox.getTemplateId();
+String clientId = sandbox.getClientId();
+String envdVersion = sandbox.getEnvdVersion();
+```
+
+These are immutable snapshots of the create/connect response, not live status. Values are
+preserved as returned: missing or JSON-null fields produce `null`, and empty strings stay empty.
+The template identifier may be a server-returned alias. `clientID` is deprecated in the upstream
+protocol and may be absent; `envdVersion` is service-reported, not a runtime binary measurement.
+`getInfo()` still fetches fresh information without updating these getters. A new `connect()`
+instance captures its own response. For Code Interpreter, use the same getters on
+`ci.getSandbox()`; obtaining that wrapped sandbox also makes no request.
 
 ### Commands
 
