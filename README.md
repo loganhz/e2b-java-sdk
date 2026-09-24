@@ -14,14 +14,14 @@ Maven:
 <dependency>
     <groupId>com.alibaba.serverless</groupId>
     <artifactId>e2b-java-sdk</artifactId>
-    <version>2.2.3</version>
+    <version>3.0.4</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation 'com.alibaba.serverless:e2b-java-sdk:2.2.3'
+implementation 'com.alibaba.serverless:e2b-java-sdk:3.0.4'
 ```
 
 Requires **Java 8+**.
@@ -110,6 +110,12 @@ Sandbox.kill(sandboxId, config);
 Sandbox.pause(sandboxId, config);
 ```
 
+### Create/connect response fields
+
+The returned sandbox exposes `getTemplateId()`, `getClientId()`, and `getEnvdVersion()`
+from the create or connect response without an additional request. Missing fields return `null`;
+`getInfo()` fetches fresh information without changing these response snapshots.
+
 ### Commands
 
 ```java
@@ -174,22 +180,29 @@ Template.delete(templateId, config);
 
 > Custom template builds are image-based (`fromImage`); each template supports one build.
 
-### Storage & network mounts (FC Extensions)
+### Sandbox metadata (FC Extensions)
 
-云沙箱 can attach Alibaba Cloud storage and VPC networking via the `StorageMounts` helper (delivered through sandbox `metadata`):
+Use `SandboxMetadata` to configure Alibaba Cloud storage, networking, identity, and observability features:
 
 ```java
-import dev.e2b.sdk.storage.StorageMounts;
+import dev.e2b.sdk.SandboxMetadata;
 
-Map<String, String> metadata = StorageMounts.builder()
+Map<String, String> metadata = SandboxMetadata.builder()
         .oss(ossConfig)                        // dynamically mount OSS
+        .agenticBucket(agenticBucketConfig)    // mount an AgenticBucket BucketSpace
         .nas(nasConfig)                        // mount NAS
         .vpc(vpcConfig)                        // bind to a VPC
-        .roleArn("acs:ram::<uid>:role/<name>") // RAM role (required for OSS)
+        .roleArn("acs:ram::<uid>:role/<name>") // RAM role (required for OSS/AgenticBucket)
+        .put("custom.metadata.key", "value")  // pass through custom metadata
         .build();
 
 Sandbox.create("base", config, NewSandbox.builder().metadata(metadata).build());
 ```
+
+Typed helpers are also available for PortForward VPC, PolarFS, AgenticFS, sandbox ID,
+Managed Identity, logging, and tracing. Use `put`, `putJson`, or `putAll` for custom or
+new Gateway metadata that is not yet modeled by the SDK. Existing `StorageMounts`
+code remains supported.
 
 ## Configuration
 

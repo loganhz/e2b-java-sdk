@@ -12,6 +12,7 @@
 | 恢复 | `connect(...)`（auto-resume 由 `NewSandbox.autoResume` 控制） |
 | 设置超时 | `setTimeout(seconds)` / `setTimeout(sandboxId, seconds, config)` |
 | 查询信息 | `getInfo()` / `getInfo(sandboxId, config)` |
+| 读取创建/连接响应字段 | `getTemplateId()` / `getClientId()` / `getEnvdVersion()`，本地快照读取 |
 | 存活探测 | `isRunning()` |
 | 列表 + 过滤 | `list(config[, SandboxQuery, limit, nextToken])`（按 metadata / state 过滤） |
 | 指标 | `getMetrics([start, end])` |
@@ -54,7 +55,7 @@
 | 列表 | `list(config)` |
 | 详情 | `get(templateId, config[, limit, nextToken])` |
 | 创建（v3） | `createV3(TemplateBuildRequestV3, config)` |
-| 镜像构建并等待就绪 | `buildFromImage(alias, image, config, timeoutSeconds)` |
+| 镜像构建并等待就绪 | `buildFromImage(alias, image, [envVars,] config, timeoutSeconds)` |
 | 触发构建 | `startBuild(templateId, buildId, TemplateBuildStartV2, config)` |
 | 构建状态 / 日志 | `getBuildStatus(...)` / `getBuildLogs(...)` |
 | 更新 / 设为公开 | `update(...)` / `setPublic(templateId, isPublic, config)` |
@@ -68,8 +69,8 @@
 | 执行代码 | `runCode(code[, language])` / `runCode(code, Context)` / `runCode(code, language, contextId, envVars, ...)` → `Execution`（results / logs / error / executionCount） |
 | 上下文管理 | `createCodeContext([cwd, language])` / `listCodeContexts()` / `removeCodeContext(...)` / `restartCodeContext(...)` |
 
-### 存储 / 网络挂载（`dev.e2b.sdk.storage.StorageMounts`）
-通过 metadata 下发，Builder 支持：`vpc(VpcConfig)`、`juicefs(JuiceFsConfig)`、`oss(OssConfig)`、`nas(NasConfig)`、`roleArn(...)`
+### 沙箱扩展 metadata（`dev.e2b.sdk.SandboxMetadata`）
+通过 `NewSandbox.metadata` 下发；Builder 支持 VPC、PortForward VPC、JuiceFS、OSS、AgenticBucket、NAS、PolarFS、AgenticFS、Managed Identity、日志、追踪及自定义键。已有 `StorageMounts` Builder 继续可用。
 
 ---
 
@@ -80,6 +81,7 @@
 | 测试类 | 覆盖能力 | 状态 |
 |---|---|---|
 | `BasicSandboxE2eTest` | create / run / kill | ✅ |
+| `SandboxMetadataNetworkE2eTest` | metadata、allowOut、rules、命令执行与允许域名访问 | 需可用模板；设置 `E2B_CLI_TEMPLATE` |
 | `CommandsE2eTest` | commands run（envs/user/cwd/timeout） | ✅ |
 | `ProcessManagementE2eTest` | runBackground / list / sendStdin / kill | ✅ |
 | `FilesystemE2eTest` | read/write/list/rename/makeDir/二进制 | ✅ |
